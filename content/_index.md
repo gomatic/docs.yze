@@ -2,31 +2,46 @@
 title: yze
 ---
 
-**yze** is the gomatic analyzer family: a suite of [`go/analysis`](https://pkg.go.dev/golang.org/x/tools/go/analysis) analyzers that encode the gomatic Go standards (sentinel error constants, named parameter types, no `goto`, …), built on a shared framework so each analyzer is a small, uniform repository. The [`stickler`](https://github.com/gomatic/stickler) runner orchestrates this suite alongside `golangci-lint`; see [docs.stickler](https://github.com/gomatic/docs.stickler) for the runner.
+**yze** is the gomatic analyzer family: a suite of [`go/analysis`](https://pkg.go.dev/golang.org/x/tools/go/analysis) analyzers that encode the gomatic Go standards (sentinel error constants, value receivers, named parameter types, the three-tier CLI layout, …), built on a shared framework so each analyzer is a small, uniform repository. The [`stickler`](https://github.com/gomatic/stickler) runner orchestrates this suite alongside `golangci-lint`; see [docs.stickler](https://github.com/gomatic/docs.stickler) for the runner.
 
 ## Architecture
 
 ```text
 go-yze            framework library (diagnostic schema, registration, fix engine, checker driver)
    ▲
-yze-<group>-<name>   one analyzer per repo (e.g. yze-go-errconst)
+yze-<name>        one analyzer per repo (e.g. yze-errconst)
    ▲
 yze               aggregator multichecker — runs the suite, emits stickler-json
 ```
 
+Analyzers are flat-named `yze-<name>` (there is no language segment — the suite is all Go), and each emits the stable rule id `yze/<name>`. Analyzers carry **category** tags (`errors`, `naming`, `types`, `immutability`, `structure`, `patterns`, `testing`, …) as metadata, used for `--category` filtering and these docs.
+
 ## Components
 
-- [**go-yze**](https://github.com/gomatic/go-yze) — the framework library every analyzer is built on: the normalized `Diagnostic`/`Report` schema (stickler-json), `Registration` with the `group`/`category` taxonomy, the `ToDiagnostic` conversion, the shared `ApplyFixes` engine, and the `checker`-based `Run` driver. A pure library (carries the `library.go` marker).
-- **`yze-<group>-<name>`** — one analyzer per repository, each exporting a standard `*analysis.Analyzer` plus a `Registration`, with `analysistest` fixtures and a standalone `singlechecker` binary. The current suite:
-  - [**yze-go-errconst**](https://github.com/gomatic/yze-go-errconst) — forbid `errors.New` and non-wrapping `fmt.Errorf` (category `errors`).
-  - [**yze-go-gotostmt**](https://github.com/gomatic/yze-go-gotostmt) — deny the `goto` statement (category `patterns`).
-  - [**yze-go-namedtypes**](https://github.com/gomatic/yze-go-namedtypes) — flag bare primitive parameter types (category `types`).
-- [**yze**](https://github.com/gomatic/yze) — the aggregator: a `go/analysis` multichecker that fans in every analyzer, filters by `group`/`category`, and emits the normalized report (`stickler-json` by default, or `text`), with `--fix`.
+- [**go-yze**](https://github.com/gomatic/go-yze) — the framework: the normalized `Diagnostic`/`Report` schema (stickler-json), `Registration`, `ToDiagnostic`, the shared `ApplyFixes` engine, the `checker`-based `Run` driver, and `ApplyConfig` (per-analyzer settings → analyzer flags). A pure library.
+- [**yze**](https://github.com/gomatic/yze) — the aggregator: a `go/analysis` multichecker over every analyzer; `--category` filtering, stickler-json/text output, `--fix`, and `--config` (per-analyzer settings).
+- **`yze-<name>`** — one analyzer per repository (standard `*analysis.Analyzer` + `Registration`, `analysistest` fixtures, standalone binary). The current suite:
 
-## Two organizing axes
+| Rule | What it enforces | Category |
+| --- | --- | --- |
+| [`yze/errconst`](https://github.com/gomatic/yze-errconst) | no `errors.New` / non-wrapping `fmt.Errorf` | errors |
+| [`yze/errlast`](https://github.com/gomatic/yze-errlast) | `error` is the last return value | errors |
+| [`yze/gotostmt`](https://github.com/gomatic/yze-gotostmt) | no `goto` | patterns |
+| [`yze/ctxfirst`](https://github.com/gomatic/yze-ctxfirst) | `context.Context` is the first parameter | patterns |
+| [`yze/namedtypes`](https://github.com/gomatic/yze-namedtypes) | named domain types for parameters | types |
+| [`yze/anonstruct`](https://github.com/gomatic/yze-anonstruct) | no anonymous struct types | types / structure |
+| [`yze/emptyiface`](https://github.com/gomatic/yze-emptyiface) | `any`, not `interface{}` (autofix) | modern-go |
+| [`yze/boolname`](https://github.com/gomatic/yze-boolname) | boolean predicate/flag naming | naming |
+| [`yze/ptrrecv`](https://github.com/gomatic/yze-ptrrecv) | value receivers (no pointer receivers without a no-copy field) | immutability |
+| [`yze/ptrparam`](https://github.com/gomatic/yze-ptrparam) | value parameters (no pointer params except idiomatic stdlib) | immutability |
+| [`yze/stdlog`](https://github.com/gomatic/yze-stdlog) | `log/slog`, not the `log` package | data |
+| [`yze/pkgstd`](https://github.com/gomatic/yze-pkgstd) | three-tier command-package standards (per-package) | structure |
+| [`yze/layout`](https://github.com/gomatic/yze-layout) | three-tier command↔domain correspondence (cross-package) | structure |
+| [`yze/testfile`](https://github.com/gomatic/yze-testfile) | unit-test files 1:1 with source | testing |
 
-- **group** — a single, stable segment in the repo/module name (`yze-<group>-<name>`); the default axis is the language/target (`go`). Few groups, by design.
-- **category** — a many-to-many semantic tag held in metadata (`errors`, `patterns`, `types`, …), used for filtering and these docs. Categories are decoupled from groups and are deliberately kept out of repo names.
+## Configuration
+
+`ptrrecv` and `ptrparam` accept a configurable `-allow` list of additional types. Settings flow through `yze --config` (or [`stickler`](https://github.com/gomatic/stickler)'s layered config), keyed by analyzer name.
 
 ## Fixes
 
