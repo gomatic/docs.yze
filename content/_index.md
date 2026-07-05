@@ -24,7 +24,7 @@ Analyzers are flat-named `yze-<name>` (there is no language segment — the suit
 
 | Rule | What it enforces | Category |
 | --- | --- | --- |
-| [`yze/errconst`](https://github.com/gomatic/yze-errconst) | no `errors.New` / non-wrapping `fmt.Errorf` | errors |
+| [`yze/errconst`](https://github.com/gomatic/yze-errconst) | no `errors.New` / `fmt.Errorf` — wrap via `errs.Const.With` (`exempt` defaults to `go-error` itself) | errors |
 | [`yze/errlast`](https://github.com/gomatic/yze-errlast) | `error` is the last return value | errors |
 | [`yze/gotostmt`](https://github.com/gomatic/yze-gotostmt) | no `goto` | patterns |
 | [`yze/ctxfirst`](https://github.com/gomatic/yze-ctxfirst) | `context.Context` is the first parameter | patterns |
