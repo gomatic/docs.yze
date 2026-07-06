@@ -7,7 +7,7 @@ Canonical template for a project's **public docs** repository (`<org>/docs.<proj
 ## Layout
 
 | Path | Purpose |
-|------|---------|
+| --- | --- |
 | [`content/`](content/) | Markdown documentation — the Hugo site content. |
 | [`layouts/`](layouts/) | Hugo templates. |
 | [`hugo.json`](hugo.json) | Hugo configuration. |
